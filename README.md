@@ -6,11 +6,14 @@ Notes for reasoning about GPU MODE QR_2 kernels and input-aware dispatch.
 
 - [inputs.md](inputs.md): edge cases, benchmark shape buckets, and dispatch notes for compact Householder QR.
 - [design.md](design.md): panel/blocking explanation and dispatch strategy.
+- [B200.md](B200.md): B200-specific hardware assumptions and tuning guidance.
 - [kernel_development_loop.md](kernel_development_loop.md): workflow for developing, tuning, profiling, and promoting kernels.
+- [AGENTS.md](AGENTS.md): contributor/agent guide for the competition workflow and constraints.
 - [SUBMIT.md](SUBMIT.md): `uv` setup and Popcorn submission commands for `qr_v2`.
 - [PROFILE.md](PROFILE.md): Nsight Compute workflow for CUDA machines.
 - [EXPERIMENTS.md](EXPERIMENTS.md): empirical sweep workflow for dispatch and block-size choices.
 - [local_eval.py](local_eval.py): local copy of the official `qr_v2` input generator and checker.
+- [kernels/](kernels): Python kernel variants plus CUDA/Triton templates.
 - [qr_practice/](qr_practice): local PyTorch practice implementations for compact Householder QR.
 
 ## Context

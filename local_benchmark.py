@@ -11,6 +11,7 @@ from typing import Any
 import torch
 
 import local_eval
+from autotune.hardware import get_profile
 
 Spec = dict[str, int | str]
 Kernel = Callable[[torch.Tensor], tuple[torch.Tensor, torch.Tensor]]
@@ -180,6 +181,11 @@ def _geomean(values: list[float]) -> float:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Local qr_v2 checker and benchmark runner.")
     parser.add_argument("--module", default="submission", help="Module containing custom_kernel.")
+    parser.add_argument(
+        "--hardware",
+        default="b200",
+        help="Target hardware profile. Default: b200.",
+    )
     parser.add_argument("--mode", choices=["test", "benchmark"], default="benchmark")
     parser.add_argument("--suite", choices=["smoke", "official"], default="smoke")
     parser.add_argument("--warmups", type=int, default=1)
@@ -190,6 +196,7 @@ def main() -> int:
     parser.add_argument("--no-recheck", action="store_true")
     args = parser.parse_args()
 
+    hardware = get_profile(args.hardware)
     kernel = _load_kernel(args.module)
     specs = _select_specs(args.mode, args.suite)
     if args.case_index is not None:
@@ -204,7 +211,10 @@ def main() -> int:
         return 0
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"device={device} torch={torch.__version__} module={args.module}")
+    print(
+        f"target={hardware.gpu} arch={hardware.architecture} "
+        f"device={device} torch={torch.__version__} module={args.module}"
+    )
     print(f"mode={args.mode} suite={args.suite} cases={len(specs)}")
 
     if args.mode == "test":

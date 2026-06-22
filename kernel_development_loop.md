@@ -4,17 +4,20 @@ The goal is not to guess the final QR kernel. The goal is to create a repeatable
 loop that turns one kernel idea into evidence: correctness, timing, profiler
 data, and a dispatch decision.
 
+The target GPU is B200. Develop on other machines only for correctness and smoke
+tests; final performance choices require B200 evidence.
+
 ## 1. Define The Kernel Variant
 
 Each kernel idea should have a narrow purpose:
 
 ```text
-small_n_householder
-blocked_wy_b16
-blocked_wy_b32
-robust_householder_b32
-triangular_fast_path
-large_n_fallback
+python_blocked_b16
+python_blocked_b32
+python_triangular
+cuda_small_n32
+cuda_blocked_wy_b32
+triton_small_n
 cholesky_probe
 ```
 
@@ -22,6 +25,7 @@ Record the intended scope before coding:
 
 - target `n`
 - target cases
+- implementation language
 - panel width
 - expected fast path or robust path
 - expected failure modes
@@ -50,8 +54,15 @@ This phase answers: does the algorithm produce valid `(H, tau)` at all?
 
 ## 3. Add A Kernel Wrapper
 
-Put candidate implementations under `kernels/` during development. Keep wrappers
-small and explicit:
+Put candidate implementations under `kernels/` during development:
+
+```text
+kernels/python/   runnable PyTorch/Python variants
+kernels/cuda/     CUDA C++ templates and extension sources
+kernels/triton/   Triton experiments
+```
+
+Keep wrappers small and explicit:
 
 ```python
 def custom_kernel(data):
@@ -91,9 +102,10 @@ Use autotune to measure block sizes and variants:
 
 ```bash
 uv run --group practice python -m autotune.sweep \
+  --hardware b200 \
   --n 32,64,128 \
   --cases dense,rankdef,clustered,mixed \
-  --variants geqrf,blocked \
+  --variants python_geqrf,python_blocked \
   --block-sizes 4,8,16,32,64 \
   --output results/block_sweep.csv
 ```
@@ -102,11 +114,12 @@ On a CUDA/B200-style machine:
 
 ```bash
 uv run --group practice python -m autotune.sweep \
+  --hardware b200 \
   --n 512,1024 \
   --batch 16 \
   --cases dense,rankdef,nearrank,clustered,rowscale,nearcollinear,mixed \
-  --variants geqrf,blocked,cholesky \
-  --block-sizes 16,32,64,128 \
+  --variants python_geqrf,python_blocked,cholesky_probe \
+  --block-sizes auto \
   --repeats 5 \
   --output results/b200_dispatch_sweep.csv
 ```

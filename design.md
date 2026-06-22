@@ -56,6 +56,25 @@ while still shifting by one column inside each panel.
 
 ## Shape Dispatch
 
+All dispatch decisions target B200. CPU and non-B200 runs are useful for
+correctness and smoke timing only.
+
+The central B200 principle is to minimize data movement. QR has serial panel
+dependencies, so the panel work rarely reaches peak compute. The best chance to
+use B200 well is to keep panel data resident and make trailing updates large,
+tiled, coalesced, and GEMM-like.
+
+Data-movement priorities:
+
+1. Avoid extra global reads/writes of the full matrix.
+2. Keep active panel data in registers/shared memory where possible.
+3. Reuse `V` and `T` across many trailing-update tiles.
+4. Fuse small operations when it does not harm correctness.
+5. Avoid many tiny kernels, especially for `n=32`.
+6. Prefer contiguous/coalesced access for trailing matrix updates.
+7. Do not split mixed batches unless the saved compute outweighs mask/scatter
+   and extra-launch costs.
+
 Use shape to choose the kernel family first:
 
 ```python
@@ -74,14 +93,145 @@ else:
 Suggested first panel widths:
 
 ```text
-n=176/352: 16 or 32
-n=512:     32 or 64
-n=1024:    32 or 64
-n>=2048:   64 or 128
+n=32:      1, 2, 4, 8, 16 or a special small-n path
+n=176/352: 8, 16, 32
+n=512:     16, 32, 64
+n=1024:    16, 32, 64
+n>=2048:   32, 64, 128
 ```
 
 These are tuning starting points, not rules. The best value depends on shared
 memory, register pressure, occupancy, and trailing-update efficiency.
+
+## B200 Shape Hypotheses
+
+Working model:
+
+```text
+panel factorization: latency/synchronization-bound
+naive updates:       memory-bound
+blocked updates:     best chance to become compute-efficient
+```
+
+For FP32 on B200, the rough ridge point is `75 TFLOP/s / 8 TB/s = 9.375`
+FLOP/byte. Work below that arithmetic intensity is likely HBM-bound. Panel QR
+will often be below the ridge or limited by synchronization; trailing updates
+should be designed to reuse data enough to move right on the roofline.
+
+### n=32, batch=20
+
+Likely bottleneck: launch overhead, synchronization, and global-memory traffic,
+not raw FLOPs.
+
+Hypotheses:
+
+- Use a specialized small-n path.
+- Keep the full matrix in registers/shared memory.
+- One CTA per matrix, or one CTA handling multiple matrices, should be tested.
+- Avoid blocked-WY machinery unless it proves faster.
+- Avoid Tensor Cores; setup overhead and QR dependencies likely dominate.
+- Minimize full-matrix global round trips.
+
+### n=176, batch=40
+
+Likely bottleneck: panel overhead plus moderate trailing-update work.
+
+Hypotheses:
+
+- Test panel widths `8`, `16`, `32`.
+- Start with `b=16`.
+- Keep panels in shared memory.
+- Use warp/block reductions for reflector norms.
+- Make trailing updates tiled and FP32.
+- Tensor Cores are experimental only; correctness risk is high.
+
+### n=352, batch=40
+
+Likely bottleneck: trailing updates start to matter more.
+
+Hypotheses:
+
+- Test `b=16` and `b=32`.
+- `b=32` may win for dense inputs by improving update efficiency.
+- `b=16` may be safer if register/shared-memory pressure hurts occupancy.
+- Reuse panel reflectors across multiple trailing tiles.
+- Coalesced global writes matter.
+
+### n=512, batch=640
+
+This is the main optimization target. Large batch makes occupancy easier, so
+per-matrix data movement and update efficiency dominate.
+
+Hypotheses:
+
+- Build a specialized 512 path.
+- Test `b=32` and `b=64`.
+- Dense cases may prefer `b=64` if trailing updates dominate.
+- Hard cases may prefer robust `b=32`.
+- Keep `V/T` panel data resident and reused over trailing tiles.
+- Make trailing updates as GEMM-like as possible.
+- Classifier or mask dispatch is plausible only if the dense fast path is much
+  faster than robust whole-batch dispatch.
+
+### n=1024, batch=60
+
+Less batch parallelism than `512`, but more work per matrix.
+
+Hypotheses:
+
+- Start with robust blocked Householder.
+- Test `b=32` and `b=64`.
+- Larger trailing tiles should improve arithmetic intensity.
+- Dense may benefit from `b=64`.
+- `mixed` and `nearrank` likely need robust `b=32` or careful panel checks.
+- Avoid fragile approximate updates until FP32 path is passing.
+
+### n=2048, batch=8
+
+Trailing updates dominate, but batch parallelism is small.
+
+Hypotheses:
+
+- Need intra-matrix parallelism, not just one CTA per matrix.
+- Test `b=32`, `b=64`, `b=128`.
+- Multi-CTA trailing updates are likely required.
+- Library fallback may be competitive early.
+- Data movement dominates: avoid repeated full trailing-matrix reads.
+
+### n=4096, batch=2
+
+Tiny batch, huge matrices.
+
+Hypotheses:
+
+- Need strong intra-matrix parallelism.
+- Panel factorization can become the serial bottleneck.
+- Large tiled trailing updates are mandatory for B200 utilization.
+- Conservative fallback is acceptable early while optimizing `512` and `1024`.
+- Custom work here should be driven by geometric-mean evidence.
+
+## B200 Case Hypotheses
+
+- `upper` / `diagonal`: triangular fast path can be excellent if lower-triangle
+  norm is truly negligible. Return `H=triu(A), tau=0`.
+- `dense cond=1/2`: best candidate for fastest blocked path.
+- `dense cond=4`: possible fast path, but residuals need careful testing.
+- `rankdef`: robust Householder only; Cholesky is invalid.
+- `nearrank`: robust Householder only.
+- `clustered`: global scale checks can miss later hard panels; panel checks
+  matter.
+- `rowscale`: row norm ratio matters; column-only classifiers miss it.
+- `nearcollinear`: orthogonality risk; avoid approximate updates.
+- `mixed`: compare per-matrix mask dispatch against robust whole-batch dispatch.
+
+Tensor Core hypothesis:
+
+- Use scalar FP32 for reflector generation and robust panel work.
+- First make FP32 tiled trailing updates fast and correct.
+- Experiment with TF32/FP16/BF16/FP8 only for restricted dense cases or internal
+  updates with validation/refinement.
+- Do not use low precision if final compact Householder factors fail the
+  official checker.
 
 ## Property Dispatch
 
@@ -158,12 +308,14 @@ Proposed layout:
 
 ```text
 kernels/
-  small_n.py
-  blocked_wy.py
-  robust_householder.py
-  triangular.py
-  fallback.py
-  cholesky_probe.py
+  python/
+    baseline.py
+    householder.py
+    triangular.py
+  cuda/
+    compact_householder.cu
+  triton/
+    small_n.py
 
 classifiers/
   features.py
@@ -181,6 +333,22 @@ Important constraint: Popcorn submissions are a single `submission.py` file. The
 repo can use `kernels/*.py` and `classifiers/*.py` for development, but the final
 submitted file must either inline the selected code or be generated by a packing
 script. Do not assume local imports will work in the leaderboard runtime.
+
+Second important constraint: do not use CUDA streams in submission kernels. Use
+the default stream. Streams can create timing and synchronization behavior that
+is too easy to abuse or mismeasure for this competition workflow.
+
+Kernel variants should carry an implementation language in autotune output:
+
+```text
+python_geqrf
+python_blocked
+python_triangular
+cuda_small_n32
+cuda_blocked_wy_b32
+triton_small_n
+cholesky_probe
+```
 
 Runtime shape:
 

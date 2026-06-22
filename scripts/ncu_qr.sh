@@ -2,6 +2,7 @@
 set -euo pipefail
 
 module="${QR_MODULE:-submission}"
+hardware="${QR_HARDWARE:-b200}"
 suite="${QR_SUITE:-official}"
 mode="${QR_MODE:-benchmark}"
 case_index="${QR_CASE_INDEX:-3}"
@@ -32,6 +33,7 @@ exec ncu \
   -- \
   uv run --group practice python local_benchmark.py \
     --module "${module}" \
+    --hardware "${hardware}" \
     --suite "${suite}" \
     --mode "${mode}" \
     --case-index "${case_index}" \

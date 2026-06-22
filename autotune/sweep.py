@@ -11,7 +11,13 @@ from pathlib import Path
 import torch
 
 import local_eval
-from qr_practice import blocked_compact_householder_qr, compact_householder_qr
+from autotune.hardware import auto_block_sizes, get_profile
+from kernels.python import (
+    blocked_householder_kernel,
+    geqrf_kernel,
+    triangular_kernel,
+    unblocked_householder_kernel,
+)
 
 CompactKernel = Callable[[torch.Tensor], tuple[torch.Tensor, torch.Tensor]]
 
@@ -28,6 +34,7 @@ class SweepSpec:
 @dataclasses.dataclass(frozen=True)
 class Variant:
     name: str
+    language: str
     panel_type: str
     block_size: int | None
 
@@ -85,16 +92,18 @@ def _stats(samples_ms: list[float]) -> Timing:
 
 
 def _compact_kernel_for(variant: Variant) -> CompactKernel:
-    if variant.name == "geqrf":
-        return torch.geqrf
-    if variant.name == "unblocked":
-        return compact_householder_qr
-    if variant.name == "blocked":
+    if variant.name == "python_geqrf":
+        return geqrf_kernel
+    if variant.name == "python_unblocked":
+        return unblocked_householder_kernel
+    if variant.name == "python_triangular":
+        return triangular_kernel
+    if variant.name == "python_blocked":
         if variant.block_size is None:
-            raise ValueError("blocked variant needs a block size")
+            raise ValueError("python_blocked variant needs a block size")
 
         def kernel(data: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-            return blocked_compact_householder_qr(data, block_size=variant.block_size)
+            return blocked_householder_kernel(data, block_size=variant.block_size)
 
         return kernel
     raise ValueError(f"unknown compact variant: {variant.name}")
@@ -243,20 +252,61 @@ def _make_specs(
 
 
 def _make_variants(names: list[str], block_sizes: list[int]) -> list[Variant]:
+    aliases = {
+        "geqrf": "python_geqrf",
+        "unblocked": "python_unblocked",
+        "blocked": "python_blocked",
+        "triangular": "python_triangular",
+        "cholesky": "cholesky_probe",
+    }
     variants = []
     for name in names:
-        if name == "blocked":
+        name = aliases.get(name, name)
+        if name == "python_blocked":
             variants.extend(
-                Variant(name="blocked", panel_type="compact_wy", block_size=block_size)
+                Variant(
+                    name="python_blocked",
+                    language="python",
+                    panel_type="compact_wy",
+                    block_size=block_size,
+                )
                 for block_size in block_sizes
             )
-        elif name == "unblocked":
-            variants.append(Variant(name="unblocked", panel_type="scalar", block_size=None))
-        elif name == "geqrf":
-            variants.append(Variant(name="geqrf", panel_type="library", block_size=None))
-        elif name == "cholesky":
+        elif name == "python_unblocked":
             variants.append(
-                Variant(name="cholesky", panel_type="normal_equations", block_size=None)
+                Variant(
+                    name="python_unblocked",
+                    language="python",
+                    panel_type="scalar",
+                    block_size=None,
+                )
+            )
+        elif name == "python_geqrf":
+            variants.append(
+                Variant(
+                    name="python_geqrf",
+                    language="python",
+                    panel_type="library",
+                    block_size=None,
+                )
+            )
+        elif name == "python_triangular":
+            variants.append(
+                Variant(
+                    name="python_triangular",
+                    language="python",
+                    panel_type="no_reflector",
+                    block_size=None,
+                )
+            )
+        elif name == "cholesky_probe":
+            variants.append(
+                Variant(
+                    name="cholesky_probe",
+                    language="torch_probe",
+                    panel_type="normal_equations",
+                    block_size=None,
+                )
             )
         else:
             raise ValueError(f"unknown variant: {name}")
@@ -271,8 +321,40 @@ def _row(
     message: str,
     timing: Timing,
 ) -> dict[str, object]:
+    metadata_keys = {
+        "hardware",
+        "target_gpu",
+        "target_arch",
+        "target_memory_gb",
+        "target_bandwidth_tb_s",
+        "target_fp32_tflops",
+        "target_fp64_tflops",
+        "target_tf32_dense_tflops",
+        "target_fp16_bf16_dense_tflops",
+        "target_fp8_dense_tflops",
+        "target_fp4_dense_tflops",
+        "ridge_fp32_flop_per_byte",
+        "ridge_tf32_dense_flop_per_byte",
+        "ridge_fp16_bf16_dense_flop_per_byte",
+    }
     return {
         "device": "cuda" if torch.cuda.is_available() else "cpu",
+        "hardware": props["hardware"],
+        "target_gpu": props["target_gpu"],
+        "target_arch": props["target_arch"],
+        "target_memory_gb": props["target_memory_gb"],
+        "target_bandwidth_tb_s": props["target_bandwidth_tb_s"],
+        "target_fp32_tflops": props["target_fp32_tflops"],
+        "target_fp64_tflops": props["target_fp64_tflops"],
+        "target_tf32_dense_tflops": props["target_tf32_dense_tflops"],
+        "target_fp16_bf16_dense_tflops": props["target_fp16_bf16_dense_tflops"],
+        "target_fp8_dense_tflops": props["target_fp8_dense_tflops"],
+        "target_fp4_dense_tflops": props["target_fp4_dense_tflops"],
+        "ridge_fp32_flop_per_byte": props["ridge_fp32_flop_per_byte"],
+        "ridge_tf32_dense_flop_per_byte": props["ridge_tf32_dense_flop_per_byte"],
+        "ridge_fp16_bf16_dense_flop_per_byte": props[
+            "ridge_fp16_bf16_dense_flop_per_byte"
+        ],
         "torch": torch.__version__,
         "batch": spec.batch,
         "n": spec.n,
@@ -280,6 +362,7 @@ def _row(
         "cond": spec.cond,
         "seed": spec.seed,
         "variant": variant.name,
+        "language": variant.language,
         "panel_type": variant.panel_type,
         "block_size": "" if variant.block_size is None else variant.block_size,
         "passed": passed,
@@ -289,7 +372,11 @@ def _row(
         "std_ms": timing.std_ms,
         "best_ms": timing.best_ms,
         "worst_ms": timing.worst_ms,
-        **props,
+        **{
+            key: value
+            for key, value in props.items()
+            if key not in metadata_keys
+        },
     }
 
 
@@ -308,24 +395,37 @@ def main() -> int:
     parser.add_argument("--batch", type=int, default=2)
     parser.add_argument("--cond", type=int, default=2)
     parser.add_argument("--seed", type=int, default=10000)
-    parser.add_argument("--variants", default="geqrf,unblocked,blocked,cholesky")
-    parser.add_argument("--block-sizes", default="1,2,4,8,16,32")
+    parser.add_argument(
+        "--variants",
+        default="python_geqrf,python_unblocked,python_blocked,cholesky_probe",
+    )
+    parser.add_argument(
+        "--hardware",
+        default="b200",
+        help="Hardware profile. Default: b200.",
+    )
+    parser.add_argument("--block-sizes", default="auto")
     parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--output", default="results/qr_sweep.csv")
     args = parser.parse_args()
 
+    hardware = get_profile(args.hardware)
     ns = _parse_csv_ints(args.n)
     cases = _parse_csv_strings(args.cases)
     names = _parse_csv_strings(args.variants)
-    block_sizes = _parse_csv_ints(args.block_sizes)
+    if args.block_sizes == "auto":
+        block_sizes = auto_block_sizes(hardware, ns)
+    else:
+        block_sizes = _parse_csv_ints(args.block_sizes)
     specs = _make_specs(ns, cases, batch=args.batch, cond=args.cond, seed=args.seed)
     variants = _make_variants(names, block_sizes)
 
     rows: list[dict[str, object]] = []
     print(
+        f"target={hardware.gpu} arch={hardware.architecture} "
         f"device={'cuda' if torch.cuda.is_available() else 'cpu'} torch={torch.__version__} "
-        f"specs={len(specs)} variants={len(variants)}"
+        f"specs={len(specs)} variants={len(variants)} block_sizes={block_sizes}"
     )
 
     for spec in specs:
@@ -337,8 +437,20 @@ def main() -> int:
             case=spec.case,
         )
         props = _input_properties(data)
+        props["hardware"] = hardware.name
+        props["target_gpu"] = hardware.gpu
+        props["target_arch"] = hardware.architecture
+        props["target_memory_gb"] = float(hardware.memory_gb)
+        props["target_bandwidth_tb_s"] = hardware.bandwidth_tb_s
+        props["target_fp32_tflops"] = hardware.fp32_tflops
+        props["target_fp64_tflops"] = hardware.fp64_tflops
+        props["target_tf32_dense_tflops"] = hardware.tf32_dense_tflops
+        props["target_fp16_bf16_dense_tflops"] = hardware.fp16_bf16_dense_tflops
+        props["target_fp8_dense_tflops"] = hardware.fp8_dense_tflops
+        props["target_fp4_dense_tflops"] = hardware.fp4_dense_tflops
+        props.update(hardware.roofline_rows())
         for variant in variants:
-            if variant.name == "cholesky":
+            if variant.name == "cholesky_probe":
                 passed, message, timing = _run_cholesky_variant(data, args.warmups, args.repeats)
             else:
                 passed, message, timing = _run_compact_variant(
@@ -356,7 +468,8 @@ def main() -> int:
     output = Path(args.output)
     _write_rows(output, rows)
     print(f"wrote {output}")
-    return 0 if all(bool(row["passed"]) for row in rows if row["variant"] != "cholesky") else 1
+    compact_rows = [row for row in rows if row["variant"] != "cholesky_probe"]
+    return 0 if all(bool(row["passed"]) for row in compact_rows) else 1
 
 
 if __name__ == "__main__":

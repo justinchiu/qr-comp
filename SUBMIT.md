@@ -31,6 +31,15 @@ uv run --group practice python local_benchmark.py --suite official --mode benchm
 
 The real leaderboard timing is still Popcorn on B200.
 
+## Profile With Nsight Compute
+
+`ncu` requires an NVIDIA GPU machine. See [PROFILE.md](PROFILE.md):
+
+```bash
+uv run --group practice python local_benchmark.py --suite official --list-cases
+QR_CASE_INDEX=3 ./scripts/ncu_qr.sh
+```
+
 ## Submit
 
 Install and register Popcorn once:

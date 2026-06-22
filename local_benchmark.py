@@ -184,14 +184,24 @@ def main() -> int:
     parser.add_argument("--suite", choices=["smoke", "official"], default="smoke")
     parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--case-index", type=int, default=None)
     parser.add_argument("--max-cases", type=int, default=None)
+    parser.add_argument("--list-cases", action="store_true")
     parser.add_argument("--no-recheck", action="store_true")
     args = parser.parse_args()
 
     kernel = _load_kernel(args.module)
     specs = _select_specs(args.mode, args.suite)
+    if args.case_index is not None:
+        if args.case_index < 0 or args.case_index >= len(specs):
+            raise ValueError(f"--case-index must be in [0, {len(specs)})")
+        specs = [specs[args.case_index]]
     if args.max_cases is not None:
         specs = specs[: args.max_cases]
+    if args.list_cases:
+        for idx, spec in enumerate(specs):
+            print(f"{idx:02d} {_spec_name(spec)}")
+        return 0
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device={device} torch={torch.__version__} module={args.module}")

@@ -3,7 +3,7 @@ name = "qr-comp"
 version = "0.1.0"
 description = "GPU MODE QR v2 submission workspace"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
@@ -15,16 +15,26 @@ practice = [
     "numpy>=2.0",
     "torch>=2.0",
 ]
+learn = [
+    "numpy>=2.0",
+    "torch>=2.0",
+    "matplotlib>=3.8",
+    "jupyterlab>=4.0",
+    "ipykernel>=6.29",
+]
 
 [tool.uv]
 package = false
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+# input_t/output_t are the contest's shared TypeVars (defined in task.py and
+# imported across modules), so they must stay module-level, not PEP 695 params.
+ignore = ["UP047"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

@@ -34,3 +34,15 @@ uv run --group practice python local_benchmark.py --hardware b200 --suite smoke
 ```
 
 The practice code includes an unblocked compact Householder QR and a blocked compact-WY trailing update implementation for CPU-side experimentation.
+
+## Learn
+
+An interactive notebook walks through Householder QR from scratch — the geometry
+of reflections, the compact `(H, tau)` `geqrf` contract, reconstructing `Q`, and
+the compact-WY blocking that the GPU kernels rely on. It runs against the
+reference code in `qr_practice/householder.py`.
+
+```bash
+uv sync --group learn
+uv run --group learn jupyter lab learn_householder_qr.ipynb
+```

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QR Swarm Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>QR Swarm Dashboard</h1>
+      <div class="header-right">
+        <span id="status" class="ok">starting…</span>
+        <button id="refresh-now">refresh</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel" id="leaderboard">
+        <div class="panel-head">
+          <h2>Leaderboard</h2>
+          <span class="hint">wins = fastest passing variant per config</span>
+        </div>
+        <div id="leaderboard-body" class="panel-body"></div>
+      </section>
+
+      <section class="panel" id="results">
+        <div class="panel-head">
+          <h2>Results vs baseline</h2>
+          <div class="controls">
+            <select id="hw-filter"></select>
+            <label><input type="checkbox" id="only-wins" /> beats baseline only</label>
+          </div>
+        </div>
+        <div class="panel-body scroll" id="results-body"></div>
+        <div class="panel-foot">sources: <span id="sources">–</span></div>
+      </section>
+
+      <section class="panel" id="agents">
+        <div class="panel-head">
+          <h2>Subagents <span id="agents-count" class="count">0</span></h2>
+          <span class="hint">stale = no status update &gt; 10 min</span>
+        </div>
+        <div id="agents-body" class="panel-body cards"></div>
+      </section>
+
+      <section class="panel wide" id="queue">
+        <div class="panel-head">
+          <h2>Queue <span id="queue-count" class="count">0</span></h2>
+        </div>
+        <div id="queue-body" class="panel-body queue-grid"></div>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

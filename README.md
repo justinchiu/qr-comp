@@ -11,6 +11,7 @@ Notes for reasoning about GPU MODE QR_2 kernels and input-aware dispatch.
 - [AGENTS.md](AGENTS.md): contributor/agent guide for the competition workflow and constraints.
 - [SUBMIT.md](SUBMIT.md): `uv` setup and Popcorn submission commands for `qr_v2`.
 - [PROFILE.md](PROFILE.md): Nsight Compute workflow for CUDA machines.
+- [baselines/](baselines): stable baseline modules, including `torch.geqrf`, for profiling.
 - [EXPERIMENTS.md](EXPERIMENTS.md): empirical sweep workflow for dispatch and block-size choices.
 - [local_eval.py](local_eval.py): local copy of the official `qr_v2` input generator and checker.
 - [kernels/](kernels): Python kernel variants plus CUDA/Triton templates.

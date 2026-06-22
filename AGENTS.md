@@ -110,6 +110,10 @@ python_triangular
 cholesky_probe
 ```
 
+Stable baseline modules live under `baselines/`. Use
+`baselines.geqrf_baseline` when profiling the `torch.geqrf` reference so later
+changes to `submission.py` do not overwrite the baseline.
+
 Future variants should be named by language and purpose:
 
 ```text
@@ -245,6 +249,12 @@ Profile one case:
 
 ```bash
 QR_CASE_INDEX=3 ./scripts/ncu_qr.sh
+```
+
+Profile the `torch.geqrf` baseline first:
+
+```bash
+./scripts/profile_geqrf_baseline.sh
 ```
 
 Useful overrides:

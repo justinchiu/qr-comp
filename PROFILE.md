@@ -57,6 +57,16 @@ uv sync --group practice
 QR_HARDWARE=b200 QR_CASE_INDEX=3 ./scripts/ncu_qr.sh
 ```
 
+Before profiling custom kernels, profile the stable `torch.geqrf` baseline:
+
+```bash
+uv sync --group practice
+./scripts/profile_geqrf_baseline.sh
+```
+
+This runs `baselines.geqrf_baseline`, not `submission.py`, so the baseline stays
+available after `submission.py` changes.
+
 Useful overrides:
 
 ```bash
@@ -64,6 +74,7 @@ QR_CASE_INDEX=7 NCU_SET=roofline ./scripts/ncu_qr.sh
 QR_CASE_INDEX=3 NCU_KERNEL_NAME='.*qr.*' ./scripts/ncu_qr.sh
 QR_CASE_INDEX=3 NCU_LAUNCH_SKIP=10 NCU_LAUNCH_COUNT=1 ./scripts/ncu_qr.sh
 QR_CASE_INDEX=3 QR_REPEATS=3 ./scripts/ncu_qr.sh
+GEQRF_BASELINE_CASES="3 7" NCU_SET=full ./scripts/profile_geqrf_baseline.sh
 ```
 
 Reports are written under `profiles/` and ignored by git.
@@ -101,6 +112,10 @@ eligible warps per cycle
 For Tensor Core experiments, also collect tensor-pipe utilization and precision
 path metrics. Do not promote Tensor Core paths unless final compact Householder
 output passes the FP32-style QR checker.
+
+For the `torch.geqrf` baseline, record the cuSOLVER/kernel names that dominate
+each case. This establishes whether the library baseline is spending time in
+panel factorization, trailing updates, memory movement, or launch overhead.
 
 ## Bottleneck Classification
 
@@ -171,7 +186,13 @@ For `n=2048/4096`:
 uv run --group practice python local_benchmark.py --hardware b200 --suite official --mode test
 ```
 
-2. Run autotune timing sweep:
+2. Profile the stable `torch.geqrf` baseline:
+
+```bash
+./scripts/profile_geqrf_baseline.sh
+```
+
+3. Run autotune timing sweep:
 
 ```bash
 uv run --group practice python -m autotune.sweep \
@@ -185,11 +206,11 @@ uv run --group practice python -m autotune.sweep \
   --output results/b200_dispatch_sweep.csv
 ```
 
-3. Profile the fastest passing candidates and the surprising failures.
+4. Profile the fastest passing candidates and the surprising failures.
 
-4. Update the dispatch/classifier only when the profile explains the timing.
+5. Update the dispatch/classifier only when the profile explains the timing.
 
-5. Re-run Popcorn benchmark after packing into `submission.py`.
+6. Re-run Popcorn benchmark after packing into `submission.py`.
 
 ## Submission Note
 

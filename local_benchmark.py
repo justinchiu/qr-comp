@@ -107,18 +107,23 @@ def _synchronize() -> None:
 
 
 def _time_one(kernel: Kernel, data: torch.Tensor) -> float:
+    # Clone outside the timed region so the kernel always sees pristine input
+    # (a kernel that mutates its argument in place must not corrupt later runs)
+    # without charging the copy to the measurement.
     if torch.cuda.is_available():
+        payload = _clone_data(data)
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         _synchronize()
         start.record()
-        kernel(data)
+        kernel(payload)
         end.record()
         _synchronize()
         return float(start.elapsed_time(end))
 
+    payload = _clone_data(data)
     start_ns = time.perf_counter_ns()
-    kernel(data)
+    kernel(payload)
     end_ns = time.perf_counter_ns()
     return (end_ns - start_ns) / 1e6
 

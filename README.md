@@ -7,6 +7,8 @@ Notes for reasoning about GPU MODE QR_2 kernels and input-aware dispatch.
 - [inputs.md](inputs.md): edge cases, benchmark shape buckets, and dispatch notes for compact Householder QR.
 - [design.md](design.md): panel/blocking explanation and dispatch strategy.
 - [B200.md](B200.md): B200-specific hardware assumptions and tuning guidance.
+- [REMOTE_RUNBOOK.md](REMOTE_RUNBOOK.md): Prime Intellect and AWS Spot GPU rental plus A100/H100/B200 sweep runbooks.
+- [SWARM.md](SWARM.md): simple file-based multi-agent coordination for remote GPU jobs.
 - [kernel_development_loop.md](kernel_development_loop.md): workflow for developing, tuning, profiling, and promoting kernels.
 - [AGENTS.md](AGENTS.md): contributor/agent guide for the competition workflow and constraints.
 - [SUBMIT.md](SUBMIT.md): `uv` setup and Popcorn submission commands for `qr_v2`.

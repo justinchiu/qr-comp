@@ -92,8 +92,95 @@ B200 = HardwareProfile(
     ),
 )
 
+A100_80GB_SXM = HardwareProfile(
+    name="a100_80gb_sxm",
+    gpu="NVIDIA A100 80GB SXM",
+    architecture="Ampere",
+    memory_gb=80,
+    bandwidth_tb_s=2.039,
+    system_gpus=1,
+    system_memory_gb=80,
+    system_bandwidth_tb_s=2.039,
+    nvlink_generation="3",
+    nvlink_gpu_to_gpu_tb_s=0.6,
+    tensor_core_generation="3",
+    fp4_dense_tflops=0.0,
+    fp4_sparse_tflops=0.0,
+    fp8_dense_tflops=0.0,
+    fp8_sparse_tflops=0.0,
+    fp16_bf16_dense_tflops=312.0,
+    fp16_bf16_sparse_tflops=624.0,
+    tf32_dense_tflops=156.0,
+    tf32_sparse_tflops=312.0,
+    fp32_tflops=19.5,
+    fp64_tflops=19.5,
+    notes=(
+        "A100 80GB SXM is a development/profiling target for CUDA iteration, not the "
+        "QR v2 leaderboard target."
+    ),
+)
+
+A100_80GB_PCIE = HardwareProfile(
+    name="a100_80gb_pcie",
+    gpu="NVIDIA A100 80GB PCIe",
+    architecture="Ampere",
+    memory_gb=80,
+    bandwidth_tb_s=1.935,
+    system_gpus=1,
+    system_memory_gb=80,
+    system_bandwidth_tb_s=1.935,
+    nvlink_generation="3",
+    nvlink_gpu_to_gpu_tb_s=0.6,
+    tensor_core_generation="3",
+    fp4_dense_tflops=0.0,
+    fp4_sparse_tflops=0.0,
+    fp8_dense_tflops=0.0,
+    fp8_sparse_tflops=0.0,
+    fp16_bf16_dense_tflops=312.0,
+    fp16_bf16_sparse_tflops=624.0,
+    tf32_dense_tflops=156.0,
+    tf32_sparse_tflops=312.0,
+    fp32_tflops=19.5,
+    fp64_tflops=9.7,
+    notes=(
+        "A100 80GB PCIe is a development/profiling target for CUDA iteration, not the "
+        "QR v2 leaderboard target."
+    ),
+)
+
+H100_80GB_SXM = HardwareProfile(
+    name="h100_80gb_sxm",
+    gpu="NVIDIA H100 80GB SXM",
+    architecture="Hopper",
+    memory_gb=80,
+    bandwidth_tb_s=3.35,
+    system_gpus=1,
+    system_memory_gb=80,
+    system_bandwidth_tb_s=3.35,
+    nvlink_generation="4",
+    nvlink_gpu_to_gpu_tb_s=0.9,
+    tensor_core_generation="4",
+    fp4_dense_tflops=0.0,
+    fp4_sparse_tflops=0.0,
+    fp8_dense_tflops=1979.0,
+    fp8_sparse_tflops=3958.0,
+    fp16_bf16_dense_tflops=989.5,
+    fp16_bf16_sparse_tflops=1979.0,
+    tf32_dense_tflops=494.5,
+    tf32_sparse_tflops=989.0,
+    fp32_tflops=67.0,
+    fp64_tflops=34.0,
+    notes=(
+        "H100 80GB SXM is a strong CUDA/profiling target for iteration, but B200 "
+        "remains the QR v2 leaderboard target."
+    ),
+)
+
 PROFILES = {
+    A100_80GB_PCIE.name: A100_80GB_PCIE,
+    A100_80GB_SXM.name: A100_80GB_SXM,
     B200.name: B200,
+    H100_80GB_SXM.name: H100_80GB_SXM,
 }
 
 

@@ -15,7 +15,7 @@ Torch is available as an optional practice dependency for local CPU experiments:
 ```bash
 uv sync --group practice
 uv run --group practice pytest
-uv run --group practice python local_benchmark.py --suite smoke
+uv run --group practice python local_benchmark.py --hardware b200 --suite smoke
 ```
 
 Popcorn still injects the official `task.py` and CUDA runtime dependencies when it
@@ -25,8 +25,8 @@ The local benchmark harness has a small smoke suite by default. On a CUDA machin
 you can run the official QR v2 shapes locally:
 
 ```bash
-uv run --group practice python local_benchmark.py --suite official --mode test
-uv run --group practice python local_benchmark.py --suite official --mode benchmark
+uv run --group practice python local_benchmark.py --hardware b200 --suite official --mode test
+uv run --group practice python local_benchmark.py --hardware b200 --suite official --mode benchmark
 ```
 
 The real leaderboard timing is still Popcorn on B200.
@@ -36,8 +36,9 @@ The real leaderboard timing is still Popcorn on B200.
 `ncu` requires an NVIDIA GPU machine. See [PROFILE.md](PROFILE.md):
 
 ```bash
-uv run --group practice python local_benchmark.py --suite official --list-cases
-QR_CASE_INDEX=3 ./scripts/ncu_qr.sh
+uv run --group practice python local_benchmark.py --hardware b200 --suite official --list-cases
+./scripts/profile_geqrf_baseline.sh
+QR_HARDWARE=b200 QR_CASE_INDEX=3 ./scripts/ncu_qr.sh
 ```
 
 ## Submit

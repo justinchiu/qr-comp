@@ -233,6 +233,35 @@ Tensor Core hypothesis:
 - Do not use low precision if final compact Householder factors fail the
   official checker.
 
+## Immediate B200 Profiling Baseline
+
+Before building or promoting custom kernels, profile the stable `torch.geqrf`
+baseline on B200:
+
+```bash
+uv sync --group practice
+./scripts/profile_geqrf_baseline.sh
+```
+
+This uses `baselines.geqrf_baseline`, not `submission.py`, so the baseline stays
+available after `submission.py` changes.
+
+First table to produce:
+
+```text
+case | n    | batch | input     | geqrf ms | bottleneck | dominant kernels | notes
+3    | 512  | 640   | dense     | ...      | ...        | ...              | ...
+7    | 512  | 640   | mixed     | ...      | ...        | ...              | ...
+9    | 512  | 640   | rankdef   | ...      | ...        | ...              | ...
+10   | 512  | 640   | clustered | ...      | ...        | ...              | ...
+4    | 1024 | 60    | dense     | ...      | ...        | ...              | ...
+8    | 1024 | 60    | mixed     | ...      | ...        | ...              | ...
+11   | 1024 | 60    | nearrank  | ...      | ...        | ...              | ...
+```
+
+Use that table to decide whether the first custom kernel should target launch
+overhead, data movement, robust panel handling, or tiled trailing updates.
+
 ## Property Dispatch
 
 Shape is not enough. `n=512` and `n=1024` include dense, mixed, rank-deficient,

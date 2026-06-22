@@ -28,7 +28,7 @@ The main implementation problem is not only choosing a fast QR kernel by shape, 
 ```bash
 uv sync --group practice
 uv run --group practice pytest
-uv run --group practice python local_benchmark.py --suite smoke
+uv run --group practice python local_benchmark.py --hardware b200 --suite smoke
 ```
 
 The practice code includes an unblocked compact Householder QR and a blocked compact-WY trailing update implementation for CPU-side experimentation.

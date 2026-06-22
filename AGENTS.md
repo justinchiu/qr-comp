@@ -222,7 +222,7 @@ Run checks:
 ```bash
 uv run ruff check .
 uv run --group practice pytest -q
-uv run --group practice python local_benchmark.py --suite smoke --mode benchmark
+uv run --group practice python local_benchmark.py --hardware b200 --suite smoke --mode benchmark
 ```
 
 This validates mechanics only. Do not select final kernels or block sizes from
@@ -231,8 +231,8 @@ CPU results.
 Run official-shape local checks on a CUDA machine:
 
 ```bash
-uv run --group practice python local_benchmark.py --suite official --mode test
-uv run --group practice python local_benchmark.py --suite official --mode benchmark
+uv run --group practice python local_benchmark.py --hardware b200 --suite official --mode test
+uv run --group practice python local_benchmark.py --hardware b200 --suite official --mode benchmark
 ```
 
 ## Profiling
@@ -242,13 +242,13 @@ This Mac does not have an NVIDIA GPU. `ncu` must run on a CUDA machine.
 List official benchmark cases:
 
 ```bash
-uv run --group practice python local_benchmark.py --suite official --list-cases
+uv run --group practice python local_benchmark.py --hardware b200 --suite official --list-cases
 ```
 
 Profile one case:
 
 ```bash
-QR_CASE_INDEX=3 ./scripts/ncu_qr.sh
+QR_HARDWARE=b200 QR_CASE_INDEX=3 ./scripts/ncu_qr.sh
 ```
 
 Profile the `torch.geqrf` baseline first:

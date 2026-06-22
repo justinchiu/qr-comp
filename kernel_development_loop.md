@@ -43,9 +43,10 @@ Use `local_eval.py` to check the exact QR v2 contract:
 ```bash
 uv run --group practice pytest
 uv run --group practice python -m autotune.sweep \
+  --hardware b200 \
   --n 8,16,32 \
   --cases dense,rankdef,clustered,mixed \
-  --variants geqrf,blocked,cholesky \
+  --variants python_geqrf,python_blocked,cholesky_probe \
   --block-sizes 2,4,8,16 \
   --output results/python_probe.csv
 ```
@@ -78,14 +79,14 @@ is a pack step.
 Run official-style generated cases locally:
 
 ```bash
-uv run --group practice python local_benchmark.py --suite smoke --mode test
-uv run --group practice python local_benchmark.py --suite official --mode test --max-cases 3
+uv run --group practice python local_benchmark.py --hardware b200 --suite smoke --mode test
+uv run --group practice python local_benchmark.py --hardware b200 --suite official --mode test --max-cases 3
 ```
 
 On a CUDA machine, run the full official test suite:
 
 ```bash
-uv run --group practice python local_benchmark.py --suite official --mode test
+uv run --group practice python local_benchmark.py --hardware b200 --suite official --mode test
 ```
 
 Failure triage:
@@ -138,8 +139,9 @@ After a kernel passes correctness and looks promising in timing, profile one
 case at a time on a CUDA machine:
 
 ```bash
-uv run --group practice python local_benchmark.py --suite official --list-cases
-QR_CASE_INDEX=3 ./scripts/ncu_qr.sh
+uv run --group practice python local_benchmark.py --hardware b200 --suite official --list-cases
+./scripts/profile_geqrf_baseline.sh
+QR_HARDWARE=b200 QR_CASE_INDEX=3 ./scripts/ncu_qr.sh
 ```
 
 Useful variants:
@@ -203,7 +205,7 @@ When a kernel and dispatch rule are ready:
 ```bash
 uv run ruff check .
 uv run --group practice pytest
-uv run --group practice python local_benchmark.py --suite smoke --mode benchmark
+uv run --group practice python local_benchmark.py --hardware b200 --suite smoke --mode benchmark
 ```
 
 5. Run Popcorn:

@@ -20,21 +20,30 @@ def _householder_vector(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, to
 
     For each input vector x, this returns beta, tau, and the stored tail of v
     where H = I - tau * v * v.T and v[0] is implicit 1.
+
+    Matches LAPACK xLARFG / torch.geqrf: when the below-diagonal tail is already
+    zero there is nothing to eliminate, so the reflector is the identity
+    (tau = 0, beta = alpha) instead of a sign-flipping no-op reflection. The
+    test keys off the *tail* norm, not the full column norm, so a column like
+    [5, 0, 0, 0] is recognised as already-triangular. Because tau = 0 means
+    H = I, the trailing update for that column can be skipped entirely.
     """
     alpha = x[:, 0]
     tail = x[:, 1:]
+    tail_norm = torch.linalg.vector_norm(tail, dim=1)
     norm = torch.linalg.vector_norm(x, dim=1)
     sign = torch.where(alpha >= 0, torch.ones_like(alpha), -torch.ones_like(alpha))
-    beta = -sign * norm
 
-    zero = norm == 0
-    beta = torch.where(zero, alpha, beta)
+    # Nothing below the diagonal to zero out -> identity reflector, sign kept.
+    zero = tail_norm == 0
+    beta = torch.where(zero, alpha, -sign * norm)
 
+    # With the -sign convention, denom = alpha - beta never cancels when the tail
+    # is non-zero; the guard only covers the already-triangular case.
     denom = alpha - beta
-    denom_safe = torch.where(denom != 0, denom, torch.ones_like(denom))
-    v_tail = tail / denom_safe[:, None]
-    tau = torch.where(beta != 0, (beta - alpha) / beta, torch.zeros_like(beta))
-    v_tail = torch.where(tau[:, None] != 0, v_tail, torch.zeros_like(v_tail))
+    denom_safe = torch.where(zero, torch.ones_like(denom), denom)
+    v_tail = torch.where(zero[:, None], torch.zeros_like(tail), tail / denom_safe[:, None])
+    tau = torch.where(zero, torch.zeros_like(beta), (beta - alpha) / beta)
     return beta, tau, v_tail
 
 
